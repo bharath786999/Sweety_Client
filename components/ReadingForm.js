@@ -3,19 +3,22 @@ import { useEffect, useState } from 'react';
 import api, { errMsg, SLOTS, slotLabel, todayIST } from '../lib/api';
 
 // Add a reading, or edit one when `editing` is set.
-export default function ReadingForm({ date, editing, onSaved, onCancel }) {
-  const [form, setForm] = useState({ date, slot: 'morning', value: '' });
+// `takenSlots` are slots already logged for the date; the first free one is pre-selected.
+export default function ReadingForm({ date, editing, takenSlots = [], onSaved, onCancel }) {
+  const firstFree = SLOTS.find((s) => !takenSlots.includes(s.value))?.value || 'morning';
+  const [form, setForm] = useState({ date, slot: firstFree, value: '' });
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
 
+  const takenKey = takenSlots.join(',');
   useEffect(() => {
     setError('');
     setForm(editing
       ? { date: editing.date, slot: editing.slot, value: String(editing.value) }
-      : { date, slot: 'morning', value: '' });
-  }, [editing, date]);
+      : { date, slot: firstFree, value: '' });
+  }, [editing, date, takenKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Quick client-side checks; the server enforces all rules again.
+  // Quick client-side checks; the server enforces every rule again.
   function check() {
     if (form.value.trim() === '') return 'Please enter a glucose value.';
     const n = Number(form.value);
@@ -53,7 +56,11 @@ export default function ReadingForm({ date, editing, onSaved, onCancel }) {
         </label>
         <label>Time slot
           <select value={form.slot} onChange={(e) => setForm({ ...form, slot: e.target.value })}>
-            {SLOTS.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
+            {SLOTS.map((s) => (
+              <option key={s.value} value={s.value}>
+                {s.icon} {s.label}{!editing && takenSlots.includes(s.value) ? ' ✓ logged' : ''}
+              </option>
+            ))}
           </select>
         </label>
         <label>Value (mg/dl)
@@ -63,7 +70,7 @@ export default function ReadingForm({ date, editing, onSaved, onCancel }) {
       </div>
       {error && <p className="error" role="alert">{error}</p>}
       <div className="row">
-        <button disabled={busy}>{editing ? 'Save changes' : 'Add reading'}</button>
+        <button disabled={busy}>{busy ? 'Saving…' : editing ? 'Save changes' : 'Add reading'}</button>
         {editing && <button type="button" className="secondary" onClick={onCancel}>Cancel</button>}
       </div>
     </form>
